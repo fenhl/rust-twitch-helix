@@ -11,10 +11,7 @@ use {
     chrono::prelude::*,
     derive_more::From,
     futures::TryFutureExt as _,
-    reqwest::{
-        IntoUrl,
-        Response
-    },
+    reqwest::IntoUrl,
     serde::{
         Deserialize,
         de::DeserializeOwned
@@ -35,6 +32,15 @@ pub enum Error {
     HttpStatus(reqwest::Error, reqwest::Result<String>),
     InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
     Reqwest(reqwest::Error)
+}
+
+impl Error {
+    fn is_spurious_network_error(&self) -> bool {
+        match self {
+            Error::HttpStatus(e, _) | Error::Reqwest(e) => e.status().map_or(false, |code| !code.is_client_error()),
+            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) => false
+        }
+    }
 }
 
 impl<I: Iterator> From<itertools::ExactlyOneError<I>> for Error {
@@ -118,13 +124,17 @@ impl Client {
             // send request
             let response_data = self.client.get(url.clone())
                 .bearer_auth(&self.token)
-                .send()
-                .and_then(|resp| async { resp.error_for_status() })
-                .and_then(Response::json)
+                .send().map_err(Error::Reqwest)
+                .and_then(|resp| async {
+                    match resp.error_for_status_ref() {
+                        Ok(_) => Ok(resp),
+                        Err(e) => Err(Error::HttpStatus(e, resp.text().await))
+                    }
+                })
                 .await;
             match response_data {
-                Ok(data) => { break data; }
-                Err(e) => if e.status().map_or(false, |code| code.is_client_error()) /*|| e.is_serialization()*/ { return Err(e.into()); } // return client errors immediately //TODO also for serialization errors
+                Ok(data) => { break data.json().await?; }
+                Err(e) => if !e.is_spurious_network_error() { return Err(e); }
             }
             let response = self.client.get(url.clone())
                 .bearer_auth(&self.token)
