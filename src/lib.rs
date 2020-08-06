@@ -32,6 +32,7 @@ pub(crate) const HELIX_BASE_URL: &str = "https://api.twitch.tv/helix";
 pub enum Error {
     #[from(ignore)]
     ExactlyOne(bool),
+    HttpStatus(reqwest::Error, reqwest::Result<String>),
     InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
     Reqwest(reqwest::Error)
 }
@@ -44,11 +45,13 @@ impl<I: Iterator> From<itertools::ExactlyOneError<I>> for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
+        match self {
             Error::ExactlyOne(true) => write!(f, "tried to get exactly one item from an iterator but it was empty"),
             Error::ExactlyOne(false) => write!(f, "tried to get exactly one item from an iterator but it contained multiple items"),
-            Error::InvalidHeaderValue(ref e) => e.fmt(f),
-            Error::Reqwest(ref e) => e.fmt(f)
+            Error::HttpStatus(e, Ok(body)) => write!(f, "{}, body:\n\n{}", e, body),
+            Error::HttpStatus(e, Err(_)) => e.fmt(f),
+            Error::InvalidHeaderValue(e) => e.fmt(f),
+            Error::Reqwest(e) => e.fmt(f)
         }
     }
 }
@@ -123,11 +126,13 @@ impl Client {
                 Ok(data) => { break data; }
                 Err(e) => if e.status().map_or(false, |code| code.is_client_error()) /*|| e.is_serialization()*/ { return Err(e.into()); } // return client errors immediately //TODO also for serialization errors
             }
-            break self.client.get(url.clone())
+            let response = self.client.get(url.clone())
                 .bearer_auth(&self.token)
-                .send().await?
-                .error_for_status()?
-                .json().await?;
+                .send().await?;
+            if let Err(e) = response.error_for_status_ref() {
+                return Err(Error::HttpStatus(e, response.text().await))
+            }
+            break response.json().await?;
         })
     }
 }
