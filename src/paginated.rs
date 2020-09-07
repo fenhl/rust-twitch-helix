@@ -31,6 +31,10 @@ impl Cursor {
     }
 }
 
+impl Default for Cursor {
+    fn default() -> Cursor { Cursor::End }
+}
+
 impl From<Option<String>> for Cursor {
     fn from(cursor: Option<String>) -> Cursor {
         if let Some(cursor) = cursor {
@@ -41,7 +45,7 @@ impl From<Option<String>> for Cursor {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 struct PaginationInfo {
     cursor: Cursor
 }
@@ -49,6 +53,7 @@ struct PaginationInfo {
 #[derive(Deserialize)]
 struct PaginatedResult<T> {
     data: Vec<T>,
+    #[serde(default)]
     pagination: PaginationInfo
 }
 

@@ -11,7 +11,10 @@ use {
     },
     itertools::Itertools as _,
     reqwest::Url,
-    serde::Deserialize,
+    serde::{
+        Deserialize,
+        Serialize
+    },
     serde_json::Value as Json,
     crate::{
         Client,
@@ -25,7 +28,8 @@ macro_rules! id_types {
     ($(#[$doc:meta] $T:ident),+) => {
         $(
             #[$doc]
-            #[derive(Deserialize, Clone, PartialEq, Eq, Hash)]
+            #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+            #[serde(transparent)]
             pub struct $T(pub String);
 
             impl fmt::Display for $T {
@@ -60,12 +64,41 @@ id_types! {
     VideoId
 }
 
+/// A “follow” relationship: `from` follows `to`.
+#[derive(Deserialize)]
+#[allow(missing_docs)]
+pub struct Follow {
+    pub from_id: UserId,
+    pub from_name: String,
+    pub to_id: UserId,
+    pub to_name: String,
+    pub followed_at: DateTime<Utc>
+}
+
+impl Follow {
+    /// <https://dev.twitch.tv/docs/api/reference#get-users-follows>
+    ///
+    /// Returns a list of all users followed by the given user.
+    pub fn from<'a>(client: &'a Client, from_id: UserId) -> impl futures::Stream<Item = Result<Follow, Error>> + 'a {
+        paginated::stream(client, format!("{}/users/follows", HELIX_BASE_URL), vec![(format!("from_id"), from_id.to_string())])
+    }
+}
+
 #[derive(Deserialize)]
 #[allow(missing_docs)]
 pub struct Game {
     pub box_art_url: Option<Url>,
     pub id: GameId,
     pub name: String
+}
+
+impl Game {
+    /// <https://dev.twitch.tv/docs/api/reference#get-games>
+    ///
+    /// Returns the games with the given IDs in arbitrary order. A maximum of 100 game IDs may be given.
+    pub fn list<'a>(client: &'a Client, ids: HashSet<GameId>) -> impl futures::Stream<Item = Result<Game, Error>> + 'a {
+        paginated::stream(client, format!("{}/games", HELIX_BASE_URL), ids.into_iter().map(|game_id| (format!("id"), game_id.0)).collect())
+    }
 }
 
 impl fmt::Display for Game {
@@ -97,6 +130,8 @@ pub struct Chatlog {
 /// Part of `Chatlog`.
 #[derive(Deserialize)]
 pub struct Message {
+    /// An inner struct with more details of the message
+    pub message: MessageMessage,
     /// Not sure what this does
     pub more_replies: Json,
     /// Not sure what this does
@@ -105,7 +140,18 @@ pub struct Message {
 
 /// Part of `Message`.
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
+pub struct MessageMessage {
+    /// The message text.
+    pub body: String,
+    /// True if this is a `/me` action.
+    pub is_action: bool,
+    /// The color this user has chosen for their nickname, if any, in hex format.
+    pub user_color: Option<String>
+}
+
+/// Part of `Message`.
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum MessageState {
     /// The only known value.
     Published
@@ -142,7 +188,8 @@ pub struct Stream {
     pub tag_ids: Vec<TagId>, //TODO verify type
     pub thumbnail_url: Url,
     pub title: String,
-    pub r#type: StreamType,
+    #[serde(rename = "type")]
+    pub stream_type: StreamType,
     pub user_id: UserId,
     pub user_name: String,
     pub viewer_count: u64
@@ -176,5 +223,55 @@ impl Stream {
 impl fmt::Display for Stream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.title.fmt(f)
+    }
+}
+
+/// As seen in `User`'s `broadcaster_type` field.
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[allow(missing_docs)]
+pub enum BroadcasterType {
+    Partner,
+    Affiliate,
+    #[serde(rename = "")]
+    Regular
+}
+
+/// As seen in `User`'s `user_type` field.
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum UserType {
+    Staff,
+    Admin,
+    GlobalMod,
+    #[serde(rename = "")]
+    Regular
+}
+
+/// A Twitch user or channel.
+#[derive(Deserialize)]
+#[allow(missing_docs)]
+pub struct User {
+    pub broadcaster_type: BroadcasterType,
+    pub description: String,
+    pub display_name: String,
+    /// Only included if the client has the `user:read:email` scope.
+    pub email: Option<String>,
+    pub id: UserId,
+    pub login: String,
+    //pub offline_image_url: Url, //TODO make optional ("" means no image)
+    //pub profile_image_url: Url, //TODO make optional ("" means no image)
+    #[serde(rename = "type")]
+    pub user_type: UserType,
+    pub view_count: u64
+}
+
+impl User {
+    /// <https://dev.twitch.tv/docs/api/reference#get-users>
+    ///
+    /// Returns the users with the given IDs in arbitrary order. A maximum of 100 user IDs may be given.
+    pub fn list<'a>(client: &'a Client, ids: HashSet<UserId>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
+        paginated::stream(client, format!("{}/users", HELIX_BASE_URL), ids.into_iter().map(|user_id| (format!("id"), user_id.0)).collect())
     }
 }
