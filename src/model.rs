@@ -9,7 +9,9 @@ use {
         Duration,
         prelude::*
     },
+    futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
+    pin_utils::pin_mut,
     reqwest::Url,
     serde::{
         Deserialize,
@@ -270,8 +272,29 @@ pub struct User {
 impl User {
     /// <https://dev.twitch.tv/docs/api/reference#get-users>
     ///
+    /// Returns the users with the given login names in arbitrary order. A maximum of 100 login names may be given.
+    pub fn by_names<'a>(client: &'a Client, names: HashSet<String>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
+        paginated::stream(client, format!("{}/users", HELIX_BASE_URL), names.into_iter().map(|name| (format!("login"), name)).collect())
+    }
+
+    /// <https://dev.twitch.tv/docs/api/reference#get-users>
+    ///
     /// Returns the users with the given IDs in arbitrary order. A maximum of 100 user IDs may be given.
     pub fn list<'a>(client: &'a Client, ids: HashSet<UserId>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
         paginated::stream(client, format!("{}/users", HELIX_BASE_URL), ids.into_iter().map(|user_id| (format!("id"), user_id.0)).collect())
+    }
+
+    /// <https://dev.twitch.tv/docs/api/reference#get-users>
+    ///
+    /// Returns the user the `client` is logged in as.
+    pub async fn me(client: &Client) -> Result<User, Error> {
+        let stream = paginated::stream(client, format!("{}/users", HELIX_BASE_URL), Vec::default());
+        pin_mut!(stream);
+        let me = stream.try_next().await?.ok_or(Error::ExactlyOne(true))?;
+        if stream.try_next().await?.is_some() {
+            Err(Error::ExactlyOne(false))
+        } else {
+            Ok(me)
+        }
     }
 }
