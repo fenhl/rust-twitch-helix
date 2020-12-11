@@ -3,11 +3,11 @@
 use {
     std::{
         collections::HashSet,
-        fmt
+        fmt,
     },
     chrono::{
         Duration,
-        prelude::*
+        prelude::*,
     },
     futures::stream::TryStreamExt as _,
     itertools::Itertools as _,
@@ -15,19 +15,19 @@ use {
     reqwest::Url,
     serde::{
         Deserialize,
-        Serialize
+        Serialize,
     },
     serde_json::Value as Json,
     crate::{
         Client,
         Error,
         HELIX_BASE_URL,
-        paginated
-    }
+        paginated,
+    },
 };
 
 macro_rules! id_types {
-    ($(#[$doc:meta] $T:ident),+) => {
+    ($(#[$doc:meta] $T:ident,)+) => {
         $(
             #[$doc]
             #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -63,7 +63,7 @@ id_types! {
     UserId,
 
     /// An unvalidated Twitch video ID.
-    VideoId
+    VideoId,
 }
 
 /// A “follow” relationship: `from` follows `to`.
@@ -74,7 +74,7 @@ pub struct Follow {
     pub from_name: String,
     pub to_id: UserId,
     pub to_name: String,
-    pub followed_at: DateTime<Utc>
+    pub followed_at: DateTime<Utc>,
 }
 
 impl Follow {
@@ -91,7 +91,7 @@ impl Follow {
 pub struct Game {
     pub box_art_url: Option<Url>,
     pub id: GameId,
-    pub name: String
+    pub name: String,
 }
 
 impl Game {
@@ -126,7 +126,7 @@ impl GameId {
 #[derive(Deserialize)]
 pub struct Chatlog {
     /// The messages in this part of the chatlog.
-    pub comments: Vec<Message>
+    pub comments: Vec<Message>,
 }
 
 /// Part of `Chatlog`.
@@ -137,7 +137,7 @@ pub struct Message {
     /// Not sure what this does
     pub more_replies: Json,
     /// Not sure what this does
-    pub state: MessageState
+    pub state: MessageState,
 }
 
 /// Part of `Message`.
@@ -148,7 +148,7 @@ pub struct MessageMessage {
     /// True if this is a `/me` action.
     pub is_action: bool,
     /// The color this user has chosen for their nickname, if any, in hex format.
-    pub user_color: Option<String>
+    pub user_color: Option<String>,
 }
 
 /// Part of `Message`.
@@ -156,7 +156,7 @@ pub struct MessageMessage {
 #[serde(rename_all = "lowercase")]
 pub enum MessageState {
     /// The only known value.
-    Published
+    Published,
 }
 
 impl VideoId {
@@ -176,7 +176,7 @@ pub enum StreamType {
     Live,
     /// Can be returned “in case of error” (whatever that means)
     #[serde(rename = "")]
-    Error
+    Error,
 }
 
 /// A stream, as returned by <https://dev.twitch.tv/docs/api/reference#get-streams>
@@ -194,7 +194,7 @@ pub struct Stream {
     pub stream_type: StreamType,
     pub user_id: UserId,
     pub user_name: String,
-    pub viewer_count: u64
+    pub viewer_count: u64,
 }
 
 impl Stream {
@@ -236,7 +236,7 @@ pub enum BroadcasterType {
     Partner,
     Affiliate,
     #[serde(rename = "")]
-    Regular
+    Regular,
 }
 
 /// As seen in `User`'s `user_type` field.
@@ -248,7 +248,7 @@ pub enum UserType {
     Admin,
     GlobalMod,
     #[serde(rename = "")]
-    Regular
+    Regular,
 }
 
 /// A Twitch user or channel.
@@ -266,7 +266,7 @@ pub struct User {
     //pub profile_image_url: Url, //TODO make optional ("" means no image)
     #[serde(rename = "type")]
     pub user_type: UserType,
-    pub view_count: u64
+    pub view_count: u64,
 }
 
 impl User {

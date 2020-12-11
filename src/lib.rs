@@ -1,22 +1,24 @@
 //! A Rust client for the [twitch.tv Helix API](https://dev.twitch.tv/docs/api).
 
-#![deny(missing_docs, rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+#![deny(missing_docs, rust_2018_idioms, unused, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
 
 use {
     std::{
         borrow::Borrow,
-        fmt
+        fmt,
     },
-    async_std::task::sleep,
     chrono::prelude::*,
     derive_more::From,
     futures::TryFutureExt as _,
     reqwest::IntoUrl,
     serde::{
         Deserialize,
-        de::DeserializeOwned
-    }
+        de::DeserializeOwned,
+    },
 };
+#[cfg(feature = "async-std")] use async_std::task::sleep;
+#[cfg(feature = "tokio")] use tokio::time::sleep;
+#[cfg(feature = "tokio02")] use tokio02::time::delay_for as sleep;
 
 pub mod model;
 pub mod paginated;
@@ -31,14 +33,14 @@ pub enum Error {
     ExactlyOne(bool),
     HttpStatus(reqwest::Error, reqwest::Result<String>),
     InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
-    Reqwest(reqwest::Error)
+    Reqwest(reqwest::Error),
 }
 
 impl Error {
     fn is_spurious_network_error(&self) -> bool {
         match self {
             Error::HttpStatus(e, _) | Error::Reqwest(e) => e.status().map_or(false, |code| !code.is_client_error()),
-            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) => false
+            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) => false,
         }
     }
 }
@@ -57,7 +59,7 @@ impl fmt::Display for Error {
             Error::HttpStatus(e, Ok(body)) => write!(f, "{}, body:\n\n{}", e, body),
             Error::HttpStatus(e, Err(_)) => e.fmt(f),
             Error::InvalidHeaderValue(e) => e.fmt(f),
-            Error::Reqwest(e) => e.fmt(f)
+            Error::Reqwest(e) => e.fmt(f),
         }
     }
 }
@@ -67,7 +69,7 @@ pub struct Client {
     client: reqwest::Client,
     /// If we're currently being rate limited, this has the time when the API can be called again.
     rate_limit_reset: Option<DateTime<Utc>>,
-    token: String
+    token: String,
 }
 
 impl Client {
@@ -85,7 +87,7 @@ impl Client {
                 .default_headers(headers)
                 .build()?,
             rate_limit_reset: None,
-            token: format!("{}", oauth_token)
+            token: format!("{}", oauth_token),
         })
     }
 
@@ -118,7 +120,7 @@ impl Client {
             if let Some(rate_limit_reset) = self.rate_limit_reset {
                 if let Ok(duration) = (rate_limit_reset - Utc::now()).to_std() {
                     sleep(duration).await;
-                    continue;
+                    continue
                 }
             }
             // send request
@@ -128,13 +130,13 @@ impl Client {
                 .and_then(|resp| async {
                     match resp.error_for_status_ref() {
                         Ok(_) => Ok(resp),
-                        Err(e) => Err(Error::HttpStatus(e, resp.text().await))
+                        Err(e) => Err(Error::HttpStatus(e, resp.text().await)),
                     }
                 })
                 .await;
             match response_data {
-                Ok(data) => { break data.json().await?; }
-                Err(e) => if !e.is_spurious_network_error() { return Err(e); }
+                Ok(data) => break data.json().await?,
+                Err(e) => if !e.is_spurious_network_error() { return Err(e); },
             }
             let response = self.client.get(url.clone())
                 .bearer_auth(&self.token)
@@ -142,12 +144,12 @@ impl Client {
             if let Err(e) = response.error_for_status_ref() {
                 return Err(Error::HttpStatus(e, response.text().await))
             }
-            break response.json().await?;
+            break response.json().await?
         })
     }
 }
 
 #[derive(Debug, Deserialize)]
 struct ResponseData<T> {
-    data: T
+    data: T,
 }

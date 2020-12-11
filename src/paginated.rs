@@ -5,12 +5,12 @@ use {
     futures::TryStreamExt as _,
     serde::{
         Deserialize,
-        de::DeserializeOwned
+        de::DeserializeOwned,
     },
     crate::{
         Client,
-        Error
-    }
+        Error,
+    },
 };
 
 #[derive(Deserialize)]
@@ -18,7 +18,7 @@ use {
 enum Cursor {
     Start,
     At(String),
-    End
+    End,
 }
 
 impl Cursor {
@@ -26,7 +26,7 @@ impl Cursor {
         match self {
             Cursor::Start => Some(Vec::default()),
             Cursor::At(cursor) => Some(vec![(format!("after"), cursor)]),
-            Cursor::End => None // to break the loop
+            Cursor::End => None, // to break the loop
         }
     }
 }
@@ -47,14 +47,14 @@ impl From<Option<String>> for Cursor {
 
 #[derive(Default, Deserialize)]
 struct PaginationInfo {
-    cursor: Cursor
+    cursor: Cursor,
 }
 
 #[derive(Deserialize)]
 struct PaginatedResult<T> {
     data: Vec<T>,
     #[serde(default)]
-    pagination: PaginationInfo
+    pagination: PaginationInfo,
 }
 
 pub(crate) fn stream<'a, T: DeserializeOwned>(client: &'a Client, uri: String, query: Vec<(String, String)>) -> impl futures::stream::Stream<Item = Result<T, Error>> + 'a {
@@ -65,7 +65,7 @@ pub(crate) fn stream<'a, T: DeserializeOwned>(client: &'a Client, uri: String, q
             let query = if let Some(query) = cursor.query() {
                 query
             } else {
-                return Ok(None); // Cursor::End
+                return Ok(None) // Cursor::End
             };
             let params = query_clone.into_iter().chain(query);
             let PaginatedResult { data, pagination }: PaginatedResult<T> = client.get_raw(&uri_clone, params).await?;
