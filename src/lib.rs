@@ -225,7 +225,7 @@ impl<'a> Client<'a> {
             (None, EitherOrBoth::Right(oauth_token)) | (None, EitherOrBoth::Both(_, oauth_token)) => return Ok(oauth_token.to_owned()),
             (Some(e), EitherOrBoth::Right(_)) => return Err(e),
             (_, EitherOrBoth::Left((client_secret, scopes))) | (Some(_), EitherOrBoth::Both((client_secret, scopes), _)) => {
-                self.client.get("https://id.twitch.tv/oauth2/token")
+                self.client.post("https://id.twitch.tv/oauth2/token")
                     .query(&[
                         ("client_id", &*self.client_id),
                         ("client_secret", client_secret),
