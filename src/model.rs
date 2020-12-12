@@ -81,7 +81,7 @@ impl Follow {
     /// <https://dev.twitch.tv/docs/api/reference#get-users-follows>
     ///
     /// Returns a list of all users followed by the given user.
-    pub fn from<'a>(client: &'a Client, from_id: UserId) -> impl futures::Stream<Item = Result<Follow, Error>> + 'a {
+    pub fn from<'a>(client: &'a Client<'a>, from_id: UserId) -> impl futures::Stream<Item = Result<Follow, Error>> + 'a {
         paginated::stream(client, format!("{}/users/follows", HELIX_BASE_URL), vec![(format!("from_id"), from_id.to_string())])
     }
 }
@@ -98,7 +98,7 @@ impl Game {
     /// <https://dev.twitch.tv/docs/api/reference#get-games>
     ///
     /// Returns the games with the given IDs in arbitrary order. A maximum of 100 game IDs may be given.
-    pub fn list<'a>(client: &'a Client, ids: HashSet<GameId>) -> impl futures::Stream<Item = Result<Game, Error>> + 'a {
+    pub fn list<'a>(client: &'a Client<'a>, ids: HashSet<GameId>) -> impl futures::Stream<Item = Result<Game, Error>> + 'a {
         paginated::stream(client, format!("{}/games", HELIX_BASE_URL), ids.into_iter().map(|game_id| (format!("id"), game_id.0)).collect())
     }
 }
@@ -113,7 +113,7 @@ impl GameId {
     /// Get info about this game from the API.
     ///
     /// <https://dev.twitch.tv/docs/api/reference#get-games>
-    pub async fn get(&self, client: &Client) -> Result<Game, Error> {
+    pub async fn get(&self, client: &Client<'_>) -> Result<Game, Error> {
         Ok(
             client.get_query::<_, _, _, _, Vec<_>>("/games", &[("id", self)]).await?
             .into_iter()
@@ -163,7 +163,7 @@ impl VideoId {
     /// Get the next chunk of chatlog for this video.
     ///
     /// This uses an undocumented endpoint on the old Kraken API since no equivalent functionality seems to exist in the Helix API yet.
-    pub async fn chatlog_after_timestamp(&self, client: &Client, start: Duration) -> Result<Chatlog, Error> {
+    pub async fn chatlog_after_timestamp(&self, client: &Client<'_>, start: Duration) -> Result<Chatlog, Error> {
         client.get_raw(&format!("https://api.twitch.tv/v5/videos/{}/comments", self), vec![("content_offset_seconds", format!("{}", start.num_seconds()))]).await
     }
 }
@@ -201,7 +201,7 @@ impl Stream {
     /// <https://dev.twitch.tv/docs/api/reference#get-streams>
     ///
     /// Returns a list of all streams by decreasing viewer count. The optional parameters can be used to filter down the results. `games` is limited to 10 games, and the other two are limited to 100 elements.
-    pub fn list<'a>(client: &'a Client, games: Option<HashSet<GameId>>, users: Option<HashSet<UserId>>, languages: Option<HashSet<String>>) -> impl futures::Stream<Item = Result<Stream, Error>> + 'a {
+    pub fn list<'a>(client: &'a Client<'a>, games: Option<HashSet<GameId>>, users: Option<HashSet<UserId>>, languages: Option<HashSet<String>>) -> impl futures::Stream<Item = Result<Stream, Error>> + 'a {
         let mut query = Vec::default();
         if let Some(games) = games { query.extend(games.into_iter().map(|game_id| (format!("game_id"), game_id.0))); }
         if let Some(users) = users { query.extend(users.into_iter().map(|user_id| (format!("user_id"), user_id.0))); }
@@ -210,7 +210,7 @@ impl Stream {
     }
 
     /// Convenience method to get the `Game` being streamed.
-    pub async fn game(&self, client: &Client) -> Result<Game, Error> {
+    pub async fn game(&self, client: &Client<'_>) -> Result<Game, Error> {
         self.game_id.get(client).await
     }
 
@@ -273,21 +273,21 @@ impl User {
     /// <https://dev.twitch.tv/docs/api/reference#get-users>
     ///
     /// Returns the users with the given login names in arbitrary order. A maximum of 100 login names may be given.
-    pub fn by_names<'a>(client: &'a Client, names: HashSet<String>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
+    pub fn by_names<'a>(client: &'a Client<'a>, names: HashSet<String>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
         paginated::stream(client, format!("{}/users", HELIX_BASE_URL), names.into_iter().map(|name| (format!("login"), name)).collect())
     }
 
     /// <https://dev.twitch.tv/docs/api/reference#get-users>
     ///
     /// Returns the users with the given IDs in arbitrary order. A maximum of 100 user IDs may be given.
-    pub fn list<'a>(client: &'a Client, ids: HashSet<UserId>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
+    pub fn list<'a>(client: &'a Client<'a>, ids: HashSet<UserId>) -> impl futures::Stream<Item = Result<User, Error>> + 'a {
         paginated::stream(client, format!("{}/users", HELIX_BASE_URL), ids.into_iter().map(|user_id| (format!("id"), user_id.0)).collect())
     }
 
     /// <https://dev.twitch.tv/docs/api/reference#get-users>
     ///
     /// Returns the user the `client` is logged in as.
-    pub async fn me(client: &Client) -> Result<User, Error> {
+    pub async fn me(client: &Client<'_>) -> Result<User, Error> {
         let stream = paginated::stream(client, format!("{}/users", HELIX_BASE_URL), Vec::default());
         pin_mut!(stream);
         let me = stream.try_next().await?.ok_or(Error::ExactlyOne(true))?;

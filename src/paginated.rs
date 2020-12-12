@@ -57,7 +57,7 @@ struct PaginatedResult<T> {
     pagination: PaginationInfo,
 }
 
-pub(crate) fn stream<'a, T: DeserializeOwned>(client: &'a Client, uri: String, query: Vec<(String, String)>) -> impl futures::stream::Stream<Item = Result<T, Error>> + 'a {
+pub(crate) fn stream<'a, T: DeserializeOwned>(client: &'a Client<'a>, uri: String, query: Vec<(String, String)>) -> impl futures::stream::Stream<Item = Result<T, Error>> + 'a {
     futures::stream::try_unfold(Cursor::Start, move |cursor| {
         let uri_clone = uri.clone();
         let query_clone = query.clone();
