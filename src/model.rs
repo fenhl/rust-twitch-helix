@@ -187,7 +187,8 @@ pub struct Stream {
     pub id: StreamId,
     pub language: String,
     pub started_at: DateTime<Utc>,
-    pub tag_ids: Vec<TagId>, //TODO verify type
+    /// Sometimes `None` at the start or end of a stream
+    pub tag_ids: Option<Vec<TagId>>,
     pub thumbnail_url: Url,
     pub title: String,
     #[serde(rename = "type")]
