@@ -12,6 +12,7 @@ use {
         mem,
         sync::Arc,
     },
+    async_trait::async_trait,
     chrono::prelude::*,
     derive_more::From,
     futures::TryFutureExt as _,
@@ -55,20 +56,21 @@ pub enum Error {
     HttpStatus(reqwest::Error, reqwest::Result<String>),
     InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
     Reqwest(reqwest::Error),
+    ResponseJson(serde_json::Error, String),
 }
 
 impl Error {
     fn is_invalid_oauth_token(&self) -> bool {
         match self {
             Error::HttpStatus(e, _) | Error::Reqwest(e) => e.status().map_or(false, |code| code == StatusCode::UNAUTHORIZED), //TODO check response body to make sure
-            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) => false,
+            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) | Error::ResponseJson(_, _) => false,
         }
     }
 
     fn is_spurious_network_error(&self) -> bool {
         match self {
             Error::HttpStatus(e, _) | Error::Reqwest(e) => e.status().map_or(false, |code| !code.is_client_error()),
-            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) => false,
+            Error::ExactlyOne(_) | Error::InvalidHeaderValue(_) | Error::ResponseJson(_, _) => false,
         }
     }
 }
@@ -76,6 +78,19 @@ impl Error {
 impl<I: Iterator> From<itertools::ExactlyOneError<I>> for Error {
     fn from(mut e: itertools::ExactlyOneError<I>) -> Error {
         Error::ExactlyOne(e.next().is_none())
+    }
+}
+
+#[async_trait]
+trait ResponseExt {
+    async fn json_with_text_in_error<T: DeserializeOwned>(self) -> Result<T, Error>;
+}
+
+#[async_trait]
+impl ResponseExt for reqwest::Response {
+    async fn json_with_text_in_error<T: DeserializeOwned>(self) -> Result<T, Error> {
+        let text = self.text().await?;
+        serde_json::from_str(&text).map_err(|e| Error::ResponseJson(e, text))
     }
 }
 
@@ -88,6 +103,7 @@ impl fmt::Display for Error {
             Error::HttpStatus(e, Err(_)) => e.fmt(f),
             Error::InvalidHeaderValue(e) => e.fmt(f),
             Error::Reqwest(e) => e.fmt(f),
+            Error::ResponseJson(e, body) => write!(f, "{}, body:\n\n{}", e, body),
         }
     }
 }
@@ -201,7 +217,7 @@ impl<'a> Client<'a> {
                 })
                 .await;
             match response_data {
-                Ok(data) => break data.json().await?,
+                Ok(data) => break data.json_with_text_in_error().await?,
                 Err(e) => if e.is_spurious_network_error() {
                     // simply try again
                 } else if e.is_invalid_oauth_token() {
@@ -216,7 +232,7 @@ impl<'a> Client<'a> {
             if let Err(e) = response.error_for_status_ref() {
                 return Err(Error::HttpStatus(e, response.text().await))
             }
-            break response.json().await?
+            break response.json_with_text_in_error().await?
         })
     }
 
@@ -238,7 +254,7 @@ impl<'a> Client<'a> {
         if let Err(e) = response.error_for_status_ref() {
             return Err(Error::HttpStatus(e, response.text().await))
         }
-        let new_token = response.json::<CredentialsResponse>().await?.access_token;
+        let new_token = response.json_with_text_in_error::<CredentialsResponse>().await?.access_token;
         self.credentials.write().await.set_token(new_token.clone());
         Ok(new_token)
     }
