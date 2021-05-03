@@ -28,18 +28,10 @@ use {
         Deserialize,
         de::DeserializeOwned,
     },
-};
-#[cfg(feature = "async-std")] use async_std::{
-    sync::RwLock,
-    task::sleep,
-};
-#[cfg(feature = "tokio")] use tokio::{
-    sync::RwLock,
-    time::sleep,
-};
-#[cfg(feature = "tokio02")] use tokio02::{
-    sync::RwLock,
-    time::delay_for as sleep,
+    tokio::{
+        sync::RwLock,
+        time::sleep,
+    },
 };
 
 pub mod model;

@@ -9,9 +9,11 @@ use {
         Duration,
         prelude::*,
     },
-    futures::stream::TryStreamExt as _,
+    futures::{
+        pin_mut,
+        stream::TryStreamExt as _,
+    },
     itertools::Itertools as _,
-    pin_utils::pin_mut,
     reqwest::Url,
     serde::{
         Deserialize,
