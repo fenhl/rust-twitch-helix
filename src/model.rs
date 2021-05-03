@@ -185,19 +185,22 @@ pub enum StreamType {
 #[derive(Deserialize)]
 #[allow(missing_docs)]
 pub struct Stream {
-    pub game_id: GameId,
     pub id: StreamId,
-    pub language: String,
-    pub started_at: DateTime<Utc>,
-    /// Sometimes `None` at the start or end of a stream
-    pub tag_ids: Option<Vec<TagId>>,
-    pub thumbnail_url: Url,
-    pub title: String,
+    pub user_id: UserId,
+    pub user_login: String,
+    pub user_name: String,
+    pub game_id: GameId,
+    pub game_name: String,
     #[serde(rename = "type")]
     pub stream_type: StreamType,
-    pub user_id: UserId,
-    pub user_name: String,
+    pub title: String,
     pub viewer_count: u64,
+    pub started_at: DateTime<Utc>,
+    pub language: String,
+    pub thumbnail_url: Url,
+    /// Sometimes `None` at the start or end of a stream
+    pub tag_ids: Option<Vec<TagId>>,
+    pub is_mature: bool,
 }
 
 impl Stream {
@@ -218,10 +221,8 @@ impl Stream {
     }
 
     /// Returns a URL to this stream.
-    ///
-    /// Uses [this undocumented endpoint](https://discuss.dev.twitch.tv/t/url-for-live-stream-from-helix-api-data/13706).
     pub fn url(&self) -> Url {
-        Url::parse(&format!("https://twitch.tv/streams/{}/channel/{}", self.id, self.user_id)).expect("could not create stream URL")
+        Url::parse(&format!("https://twitch.tv/{}", self.user_login)).expect("could not create stream URL")
     }
 }
 
