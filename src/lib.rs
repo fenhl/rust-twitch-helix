@@ -228,10 +228,20 @@ impl<'a> Client<'a> {
         })
     }
 
-    async fn get_oauth_token(&self, from_login_error: Option<Error>) -> Result<String, Error> {
-        let response = match (from_login_error, &self.credentials.read().await.0) {
+    /// Returns an OAuth token from the credentials with which this `Client` was constructed. If no token is cached, a new one is created by authenticating with Twitch.
+    ///
+    /// The optional parameter `from_error` can be passed to handle an “invalid OAuth token” error by reauthenticating. Other errors are returned transparently.
+    pub async fn get_oauth_token(&self, from_error: Option<Error>) -> Result<String, Error> {
+        if from_error.as_ref().map_or(false, |e| !e.is_invalid_oauth_token()) {
+            // return non-auth errors transparently
+            return Err(from_error.expect("just checked"))
+        }
+        let response = match (from_error, &self.credentials.read().await.0) {
+            // we have a cached token and no auth error, so just return that
             (None, EitherOrBoth::Right(oauth_token)) | (None, EitherOrBoth::Both(_, oauth_token)) => return Ok(oauth_token.to_owned()),
+            // there was an auth error but we only have a token, no client ID/secret, so we're unable to reauth
             (Some(e), EitherOrBoth::Right(_)) => return Err(e),
+            // there was an auth error, so reauth
             (_, EitherOrBoth::Left((client_secret, scopes))) | (Some(_), EitherOrBoth::Both((client_secret, scopes), _)) => {
                 self.client.post("https://id.twitch.tv/oauth2/token")
                     .query(&[
@@ -247,7 +257,7 @@ impl<'a> Client<'a> {
             return Err(Error::HttpStatus(e, response.text().await))
         }
         let new_token = response.json_with_text_in_error::<CredentialsResponse>().await?.access_token;
-        self.credentials.write().await.set_token(new_token.clone());
+        self.credentials.write().await.set_token(new_token.clone()); // cache the new token
         Ok(new_token)
     }
 }
