@@ -1,6 +1,6 @@
 //! A Rust client for the [twitch.tv Helix API](https://dev.twitch.tv/docs/api).
 
-#![deny(missing_docs, rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, /*unused_lifetimes,*/ /*TODO uncomment once https://github.com/rust-lang/rust/issues/78522 is fixed*/ unused_qualifications, warnings)]
+#![deny(missing_docs, rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes, unused_qualifications, warnings)]
 #![forbid(unsafe_code)]
 
 use {
