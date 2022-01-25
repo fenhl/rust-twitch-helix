@@ -16,12 +16,12 @@ use {
         stream::TryStreamExt as _,
     },
     itertools::Itertools as _,
-    reqwest::Url,
     serde::{
         Deserialize,
         Serialize,
     },
     serde_json::Value as Json,
+    url::Url,
     crate::{
         Client,
         Error,

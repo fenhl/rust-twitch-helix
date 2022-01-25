@@ -1,6 +1,7 @@
 //! A Rust client for the [twitch.tv Helix API](https://dev.twitch.tv/docs/api).
 
-#![deny(missing_docs, rust_2018_idioms, unused, unused_import_braces, /*unused_lifetimes,*/ /*TODO uncomment once https://github.com/rust-lang/rust/issues/78522 is fixed*/ unused_qualifications, warnings)]
+#![deny(missing_docs, rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, /*unused_lifetimes,*/ /*TODO uncomment once https://github.com/rust-lang/rust/issues/78522 is fixed*/ unused_qualifications, warnings)]
+#![forbid(unsafe_code)]
 
 use {
     std::{
@@ -14,7 +15,6 @@ use {
     },
     async_trait::async_trait,
     chrono::prelude::*,
-    derive_more::From,
     futures::TryFutureExt as _,
     itertools::{
         EitherOrBoth,
@@ -28,6 +28,7 @@ use {
         Deserialize,
         de::DeserializeOwned,
     },
+    thiserror::Error,
     tokio::{
         sync::RwLock,
         time::sleep,
@@ -40,14 +41,16 @@ pub mod paginated;
 pub(crate) const HELIX_BASE_URL: &str = "https://api.twitch.tv/helix";
 
 /// An enum that contains all the different kinds of errors that can occur in the library.
-#[derive(Debug, From)]
+#[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
-    #[from(ignore)]
+    #[error("tried to get exactly one item from an iterator but it {}", if *.0 { "was empty" } else { "contained multiple items" })]
     ExactlyOne(bool),
-    HttpStatus(reqwest::Error, reqwest::Result<String>),
-    InvalidHeaderValue(reqwest::header::InvalidHeaderValue),
-    Reqwest(reqwest::Error),
+    #[error("{0}{}", if let Ok(body) = .1 { format!(", body:\n\n{}", body) } else { String::default() })]
+    HttpStatus(#[source] reqwest::Error, reqwest::Result<String>),
+    #[error(transparent)] InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
+    #[error(transparent)] Reqwest(#[from] reqwest::Error),
+    #[error("{0}, body:\n\n{1}")]
     ResponseJson(serde_json::Error, String),
 }
 
@@ -83,20 +86,6 @@ impl ResponseExt for reqwest::Response {
     async fn json_with_text_in_error<T: DeserializeOwned>(self) -> Result<T, Error> {
         let text = self.text().await?;
         serde_json::from_str(&text).map_err(|e| Error::ResponseJson(e, text))
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::ExactlyOne(true) => write!(f, "tried to get exactly one item from an iterator but it was empty"),
-            Error::ExactlyOne(false) => write!(f, "tried to get exactly one item from an iterator but it contained multiple items"),
-            Error::HttpStatus(e, Ok(body)) => write!(f, "{}, body:\n\n{}", e, body),
-            Error::HttpStatus(e, Err(_)) => e.fmt(f),
-            Error::InvalidHeaderValue(e) => e.fmt(f),
-            Error::Reqwest(e) => e.fmt(f),
-            Error::ResponseJson(e, body) => write!(f, "{}, body:\n\n{}", e, body),
-        }
     }
 }
 
