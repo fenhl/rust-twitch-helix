@@ -3,7 +3,9 @@
 use {
     std::{
         collections::HashSet,
+        convert::Infallible as Never,
         fmt,
+        str::FromStr,
     },
     chrono::{
         Duration,
@@ -35,6 +37,14 @@ macro_rules! id_types {
             #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
             #[serde(transparent)]
             pub struct $T(pub String);
+
+            impl FromStr for $T {
+                type Err = Never;
+
+                fn from_str(s: &str) -> Result<Self, Never> {
+                    Ok(Self(s.to_owned()))
+                }
+            }
 
             impl fmt::Display for $T {
                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
