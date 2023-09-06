@@ -82,19 +82,22 @@ id_types! {
 #[derive(Deserialize)]
 #[allow(missing_docs)]
 pub struct Follow {
-    pub from_id: UserId,
-    pub from_name: String,
-    pub to_id: UserId,
-    pub to_name: String,
+    pub broadcaster_id: UserId,
+    pub broadcaster_login: String,
+    pub broadcaster_name: String,
     pub followed_at: DateTime<Utc>,
 }
 
 impl Follow {
-    /// <https://dev.twitch.tv/docs/api/reference#get-users-follows>
+    /// <https://dev.twitch.tv/docs/api/reference/#get-followed-channels>
     ///
-    /// Returns a list of all users followed by the given user.
-    pub fn from<'a>(client: &'a Client<'a>, from_id: UserId) -> impl futures::Stream<Item = Result<Follow, Error>> + 'a {
-        paginated::stream(client, format!("{}/users/follows", HELIX_BASE_URL), vec![(format!("from_id"), from_id.to_string())])
+    /// Returns a list of all channels followed by the authenticated user.
+    ///
+    /// Requires a [user access token](https://dev.twitch.tv/docs/authentication/#user-access-tokens) that includes the `user:read:follows` scope.
+    ///
+    /// The `user_id` parameter must be the ID of the authenticated user.
+    pub fn from<'a>(client: &'a Client<'a>, user_id: UserId) -> impl futures::Stream<Item = Result<Follow, Error>> + 'a {
+        paginated::stream(client, format!("{}/channels/follows", HELIX_BASE_URL), vec![(format!("user_id"), user_id.to_string())])
     }
 }
 
