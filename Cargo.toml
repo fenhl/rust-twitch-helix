@@ -1,6 +1,6 @@
 [package]
 name = "twitch_helix"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2021"
 

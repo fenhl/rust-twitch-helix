@@ -97,7 +97,7 @@ impl Follow {
     ///
     /// The `user_id` parameter must be the ID of the authenticated user.
     pub fn from<'a>(client: &'a Client<'a>, user_id: UserId) -> impl futures::Stream<Item = Result<Follow, Error>> + 'a {
-        paginated::stream(client, format!("{}/channels/follows", HELIX_BASE_URL), vec![(format!("user_id"), user_id.to_string())])
+        paginated::stream(client, format!("{}/channels/followed", HELIX_BASE_URL), vec![(format!("user_id"), user_id.to_string())])
     }
 }
 
