@@ -46,7 +46,7 @@ pub(crate) const HELIX_BASE_URL: &str = "https://api.twitch.tv/helix";
 pub enum Error {
     #[error("tried to get exactly one item from an iterator but it {}", if *.0 { "was empty" } else { "contained multiple items" })]
     ExactlyOne(bool),
-    #[error("{0}{}", if let Ok(body) = .1 { format!(", body:\n\n{}", body) } else { String::default() })]
+    #[error("{}{}", .0, if let Ok(body) = .1 { format!(", body:\n\n{}", body) } else { String::default() })]
     HttpStatus(#[source] reqwest::Error, reqwest::Result<String>),
     #[error(transparent)] InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
@@ -139,6 +139,7 @@ impl<'a> Client<'a> {
     ///
     /// The remaining parameters of this constructor reflect that [as of April 30, 2020, all Helix endpoints require OAuth tokens](https://discuss.dev.twitch.tv/t/requiring-oauth-for-helix-twitch-api-endpoints/23916).
     pub fn new(user_agent: &'static str, client_id: impl Into<Cow<'a, str>>, credentials: Credentials) -> Result<Client<'a>, Error> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let client_id = client_id.into();
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(reqwest::header::USER_AGENT, reqwest::header::HeaderValue::from_static(user_agent));

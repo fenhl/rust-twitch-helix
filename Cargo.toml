@@ -8,10 +8,11 @@ edition = "2021"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 futures = "0.3"
-itertools = "0.13"
-reqwest = { version = "0.12", default-features = false, features = ["charset", "http2", "json", "macos-system-configuration", "rustls-tls"] }
+itertools = "0.14"
+reqwest = { version = "0.13", default-features = false, features = ["charset", "gzip", "http2", "json", "query", "rustls-no-provider", "system-proxy", "zstd"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
-thiserror = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["sync", "time"] }
 url = { version = "2", features = ["serde"] }
